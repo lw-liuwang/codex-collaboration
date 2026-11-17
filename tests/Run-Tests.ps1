@@ -10,29 +10,29 @@ $plans = foreach ($actor in @('lw-liuwang','ZicongHe2002')) {
     foreach ($day in 1..28) { New-CollabPlan -Actor $actor -Date ('2026-11-{0:00}' -f $day) }
 }
 foreach ($plan in $plans) {
-    Assert ($plan.times.Count -eq 84) 'Expected eighty-four slots'
-    $offset = if ($plan.actor -eq 'lw-liuwang') { 0 } else { 5 }
+    Assert ($plan.times.Count -eq 168) 'Expected one hundred sixty-eight slots'
+    $offset = if ($plan.actor -eq 'lw-liuwang') { 0 } else { 2 }
     $midnight = [DateTimeOffset]::Parse("$($plan.date)T00:00:00+08:00")
     for ($i=0; $i -lt $plan.times.Count; $i++) {
         $at = [DateTimeOffset]$plan.times[$i]
         Assert ($at.Hour -ge 9 -and $at.Hour -le 22) 'Wakeup outside daytime window'
-        $jitter = ($at - $midnight).TotalMinutes - 540 - $i*10 - $offset
-        Assert ($jitter -ge 2 -and $jitter -le 4) 'Each wakeup must stay in its own random slot'
+        $jitter = ($at - $midnight).TotalMinutes - 540 - $i*5 - $offset
+        Assert ($jitter -ge 1 -and $jitter -le 2) 'Each wakeup must stay in its own random slot'
     }
     $intervals = @()
     for ($i=1; $i -lt $plan.times.Count; $i++) {
         $gap = ([DateTimeOffset]$plan.times[$i] - [DateTimeOffset]$plan.times[$i-1]).TotalMinutes
-        Assert ($gap -ge 8 -and $gap -le 12) 'Randomized gap outside intended range'
+        Assert ($gap -ge 4 -and $gap -le 6) 'Randomized gap outside intended range'
         $intervals += $gap
     }
-    Assert (@($intervals | Sort-Object -Unique).Count -gt 1) 'Wakeups must not form a fixed ten-minute grid'
+    Assert (@($intervals | Sort-Object -Unique).Count -gt 1) 'Wakeups must not form a fixed five-minute grid'
 }
 foreach ($day in 1..28) {
     $date = '2026-11-{0:00}' -f $day
     $a = New-CollabPlan -Actor lw-liuwang -Date $date
     $b = New-CollabPlan -Actor ZicongHe2002 -Date $date
     for ($i=0; $i -lt $a.times.Count; $i++) {
-        Assert (([DateTimeOffset]$b.times[$i] - [DateTimeOffset]$a.times[$i]).TotalMinutes -eq 5) 'Actors must alternate with a five-minute offset'
+        Assert (([DateTimeOffset]$b.times[$i] - [DateTimeOffset]$a.times[$i]).TotalMinutes -eq 2) 'Actors must alternate with a two-minute offset'
     }
 }
 
@@ -48,11 +48,11 @@ try {
     Assert ((Get-Content -LiteralPath $planFile -Raw) -eq $before) 'Reload must not rewrite the locked plan'
     Assert ((Get-Item -LiteralPath $planFile).LastWriteTimeUtc -eq $stamp) 'Reload must reuse the persisted file'
     $stale = Get-Content -LiteralPath $planFile -Raw | ConvertFrom-Json
-    $stale.protocolVersion = '1.2.0'
+    $stale.protocolVersion = '1.3.0'
     $stale.times = @('2026-11-17T16:26:00+08:00')
     $stale | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $planFile -Encoding utf8
     $upgraded = Get-LockedCollabPlan -Actor lw-liuwang -Date '2026-11-17' -StateRoot $planRoot
-    Assert ($upgraded.protocolVersion -eq '1.3.0' -and $upgraded.times.Count -eq 84) 'Protocol upgrade must replace the old daily plan'
+    Assert ($upgraded.protocolVersion -eq '1.4.0' -and $upgraded.times.Count -eq 168) 'Protocol upgrade must replace the old daily plan'
     Assert (($upgraded.times -join ',') -eq ($locked.times -join ',')) 'Upgrade must rebuild the deterministic new plan'
     $early = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now '2026-11-17T08:30:00+08:00'
     Assert ($early.nextAt -eq $locked.times[0]) 'Morning planner must select the first slot'
