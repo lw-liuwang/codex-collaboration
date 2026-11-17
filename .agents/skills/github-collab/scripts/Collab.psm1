@@ -66,7 +66,8 @@ function Get-LockedCollabPlan {
         $parse = @{ InputObject = Get-Content -LiteralPath $path -Raw }
         if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $parse.DateKind = 'String' }
         $saved = ConvertFrom-Json @parse
-        if ($saved.actor -eq $Actor -and $saved.protocolVersion -eq $config.protocolVersion) { return $saved }
+        $hasIdentityAndVersion = $null -ne $saved.PSObject.Properties['actor'] -and $null -ne $saved.PSObject.Properties['protocolVersion']
+        if ($hasIdentityAndVersion -and $saved.actor -eq $Actor -and $saved.protocolVersion -eq $config.protocolVersion) { return $saved }
     }
     $plan = New-CollabPlan -Actor $Actor -Date $Date
     $null = New-Item -ItemType Directory -Force $StateRoot

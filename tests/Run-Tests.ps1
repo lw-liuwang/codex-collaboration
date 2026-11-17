@@ -54,6 +54,11 @@ try {
     $upgraded = Get-LockedCollabPlan -Actor lw-liuwang -Date '2026-11-17' -StateRoot $planRoot
     Assert ($upgraded.protocolVersion -eq '1.4.0' -and $upgraded.times.Count -eq 168) 'Protocol upgrade must replace the old daily plan'
     Assert (($upgraded.times -join ',') -eq ($locked.times -join ',')) 'Upgrade must rebuild the deterministic new plan'
+    $legacy = $locked | Select-Object -Property * -ExcludeProperty protocolVersion
+    $legacy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $planFile -Encoding utf8
+    $migrated = Get-LockedCollabPlan -Actor lw-liuwang -Date '2026-11-17' -StateRoot $planRoot
+    Assert ($migrated.protocolVersion -eq '1.4.0') 'Unversioned legacy cache must migrate without a StrictMode error'
+    Assert (($migrated.times -join ',') -eq ($locked.times -join ',')) 'Legacy migration must recover the deterministic current plan'
     $early = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now '2026-11-17T08:30:00+08:00'
     Assert ($early.nextAt -eq $locked.times[0]) 'Morning planner must select the first slot'
     $next = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now $locked.times[0]
