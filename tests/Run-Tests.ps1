@@ -10,15 +10,24 @@ $plans = foreach ($actor in @('lw-liuwang','ZicongHe2002')) {
     foreach ($day in 1..28) { New-CollabPlan -Actor $actor -Date ('2026-11-{0:00}' -f $day) }
 }
 foreach ($plan in $plans) {
-    Assert ($plan.times.Count -eq 10) 'Expected ten slots'
-    Assert (@($plan.hours | Sort-Object -Unique).Count -eq 10) 'Hours must be distinct'
+    Assert ($plan.times.Count -eq 42) 'Expected forty-two slots'
+    Assert (@($plan.hours | Sort-Object -Unique).Count -eq 14) 'Expected every hour in the daytime window'
     Assert (($plan.hours | Measure-Object -Minimum).Minimum -ge 9 -and ($plan.hours | Measure-Object -Maximum).Maximum -le 22) 'Hours outside window'
-    Assert ($plan.minute -ge 5 -and $plan.minute -le 50) 'Minute outside window'
+    Assert ($plan.minutes.Count -eq 3) 'Expected three slots per hour'
+    Assert ($plan.minute -ge 2 -and $plan.minute -le 18) 'Minute outside window'
     for ($i=1; $i -lt $plan.times.Count; $i++) {
-        Assert (([DateTimeOffset]$plan.times[$i] - [DateTimeOffset]$plan.times[$i-1]).TotalMinutes -ge 60) 'Runs may overlap'
+        Assert (([DateTimeOffset]$plan.times[$i] - [DateTimeOffset]$plan.times[$i-1]).TotalMinutes -eq 20) 'Wakeups must be exactly twenty minutes apart'
     }
 }
-Assert (@($plans | ForEach-Object { $_.times -join ',' } | Sort-Object -Unique).Count -gt 40) 'Plans should vary across days and actors'
+Assert (@($plans | Where-Object actor -eq 'lw-liuwang' | ForEach-Object minute | Sort-Object -Unique).Count -ge 4) 'Daily offset should vary'
+foreach ($day in 1..28) {
+    $date = '2026-11-{0:00}' -f $day
+    $a = New-CollabPlan -Actor lw-liuwang -Date $date
+    $b = New-CollabPlan -Actor ZicongHe2002 -Date $date
+    for ($i=0; $i -lt $a.times.Count; $i++) {
+        Assert (([DateTimeOffset]$b.times[$i] - [DateTimeOffset]$a.times[$i]).TotalMinutes -eq 10) 'Actors must alternate with a ten-minute offset'
+    }
+}
 
 $global:collabTestUser = 'lw-liuwang'
 $global:collabTestPages = [Collections.Generic.List[int]]::new()

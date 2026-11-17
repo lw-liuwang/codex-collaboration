@@ -28,25 +28,29 @@ function New-CollabPlan {
     $config = Get-CollabConfig
     if ($Actor -notin $config.actors) { throw "Unknown participant: $Actor" }
     $null = [DateTime]::ParseExact($Date, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-    $seedText = "$Date|$Actor|$($config.protocolVersion)"
+    $seedText = "$Date|$($config.protocolVersion)"
     $hash = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($seedText))
     $rng = [Random]::new([BitConverter]::ToInt32($hash, 0) -band [int]::MaxValue)
-    $hours = [Collections.Generic.List[int]]::new()
-    foreach ($hour in $config.firstHour..$config.lastHour) { $hours.Add($hour) }
-    for ($i = $hours.Count - 1; $i -gt 0; $i--) {
-        $j = $rng.Next($i + 1)
-        $temp = $hours[$i]; $hours[$i] = $hours[$j]; $hours[$j] = $temp
-    }
-    $selected = @($hours | Select-Object -First $config.windowsPerDay | Sort-Object)
-    $minute = $rng.Next($config.minuteMin, $config.minuteMax + 1)
+    $selected = @($config.firstHour..$config.lastHour)
+    $actorOffset = [array]::IndexOf($config.actors, $Actor) * $config.peerOffsetMinutes
+    $minute = $rng.Next($config.minuteMin, $config.minuteMax + 1) + $actorOffset
+    $minutes = @($minute..59 | Where-Object { ($_ - $minute) % $config.intervalMinutes -eq 0 })
+    $times = @(
+        foreach ($hour in $selected) {
+            foreach ($slotMinute in $minutes) { '{0}T{1:00}:{2:00}:00+08:00' -f $Date, $hour, $slotMinute }
+        }
+    )
     [pscustomobject]@{
         actor = $Actor
+        protocolVersion = $config.protocolVersion
         date = $Date
         timezone = $config.timezone
         hours = $selected
         minute = $minute
-        times = @($selected | ForEach-Object { '{0}T{1:00}:{2:00}:00+08:00' -f $Date, $_, $minute })
-        rrule = "RRULE:FREQ=DAILY;BYHOUR=$($selected -join ',');BYMINUTE=$minute;BYSECOND=0"
+        minutes = $minutes
+        times = $times
+        rrule = "RRULE:FREQ=DAILY;BYHOUR=$($selected -join ',');BYMINUTE=$($minutes -join ',');BYSECOND=0"
+        targetRunMinutes = $config.targetRunMinutes
         maxRunMinutes = $config.maxRunMinutes
     }
 }

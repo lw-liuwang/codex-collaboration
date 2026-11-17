@@ -22,12 +22,12 @@ description: 为 lw-liuwang 与 ZicongHe2002 接入 GitHub CLI，通过 codex-co
 3. 按 [成就说明](references/achievements.md) 安排作者、共同作者、回答者和合并者。普通 PR 默认 merge commit；YOLO 的 review 请求只作尝试条件，另一方暂不 review。
 4. 使用 Git/gh 实际完成任务，读取结果，然后交接给下一行动人。正文用 --body-file/--input，避免拼接 shell 命令。
 5. 按 [写作规范](references/writing.md) 核对解释、手算和来源。结果属实才合并或采纳答案。
-6. 最多工作 60 分钟，到时记录未完成项供下一轮继续；没有任务可提前结束。执行不重叠。不为凑数创建空内容。
+6. 普通轮次争取18分钟内交接，复杂轮次最多工作60分钟，到时记录未完成项供下一轮继续；没有任务可提前结束。执行不重叠。不为凑数创建空内容。
 
 GitHub 写入失败先回查；有 reviewer 请求不代表必须立刻 review。没有对方写权限时先发起协作者邀请，仍可研究和准备内容。需要对方账号操作的部分在共享 Issue 中明确交接。
 
 ## 调度和成就
 
-按 [原生定时任务](references/scheduling.md) 配置每天十个随机时段，每机两项 heartbeat。使用当前默认模型，不擅自换模型。不手改 Codex 内部配置或另建系统 cron。
+按 [原生定时任务](references/scheduling.md) 配置每天09–23时段每20分钟唤醒、A/B错开10分钟，每机两项 heartbeat。使用当前默认模型，不擅自换模型。不手改 Codex 内部配置或另建系统 cron。
 
 每账号每天争取十五个已合并 PR，没有每日 PR 硬上限。十四天争取银级，之后继续金级。记录可见等级与操作证据，不假设所有条件已经公开，不把尝试等同到账。
