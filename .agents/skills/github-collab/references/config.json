@@ -1,8 +1,14 @@
 {
   "protocolVersion": "1.4.0",
   "hub": "lw-liuwang/codex-collaboration",
-  "actors": ["lw-liuwang", "ZicongHe2002"],
-  "repositories": {"lw-liuwang/cs336-notes":"lw-liuwang","ZicongHe2002/rsi-notes":"ZicongHe2002"},
+  "actors": [
+    "lw-liuwang",
+    "ZicongHe2002"
+  ],
+  "repositories": {
+    "lw-liuwang/cs336-notes": "lw-liuwang",
+    "ZicongHe2002/rsi-notes": "ZicongHe2002"
+  },
   "timezone": "Asia/Shanghai",
   "windowsPerDay": 168,
   "firstHour": 9,
@@ -19,6 +25,15 @@
   "maxRunMinutes": 60,
   "dailyMergedTarget": 15,
   "phaseDays": 14,
-  "silver": {"pair-extraordinaire":24,"galaxy-brain":16,"pull-shark":128},
-  "gold": {"pair-extraordinaire":48,"galaxy-brain":32,"pull-shark":1024}
+  "silver": {
+    "pair-extraordinaire": 24,
+    "galaxy-brain": 16,
+    "pull-shark": 128
+  },
+  "gold": {
+    "pair-extraordinaire": 48,
+    "galaxy-brain": 32,
+    "pull-shark": 1024
+  },
+  "schedulingMode": "native-recurring-five-minutes"
 }
