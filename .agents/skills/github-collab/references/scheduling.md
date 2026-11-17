@@ -8,6 +8,8 @@
 
 通过原生 automation_update 更新已有协作执行任务，保留聊天、提示词和通知设置。实际任务ID保存 `.local/automation.json`。不手改 automation.toml，不用系统计划任务替代原生任务。初始化在当天较晚时，只执行未来时间点；漏跑不补成密集请求。
 
+本地状态至少保存 `actor`、`workerId`、`plannerId`、`planDate`、`timezone`。先创建 worker，再创建 planner，保存两次工具返回的真实 ID；后续按 ID 更新，不按名字重复创建。每轮执行时也运行 Plan，日期已经变化且排程漏跑时补更新 worker 日程。原生工具 view 若只显示卡片，可只读本机对应 automation.toml 核对现有字段，再通过原生工具更新；不得直接改写它。人类已暂停的任务不自动恢复。
+
 提示词：
 
 > 在本机规范仓库使用 github-collab，核实当前 GitHub 身份，运行 Plan 生成北京时间当天十个随机时段。通过 Codex 原生工具更新本机已有协作执行 heartbeat，保存实际任务ID。不修改每天十次、每轮一小时和成就目标。失败如实记录，不另外创建重复任务。
