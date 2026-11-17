@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 param(
-    [Parameter(Mandatory)][ValidateSet('Doctor','Inbox','Plan')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('Doctor','Inbox','Plan','Next')][string]$Action,
     [Parameter(Mandatory)][ValidateSet('lw-liuwang','ZicongHe2002')][string]$Actor,
     [string]$Date
 )
@@ -18,13 +18,12 @@ switch ($Action) {
         Get-CollabInbox -Actor $Actor | ConvertTo-Json -Depth 30
     }
     Plan {
-        $params = @{Actor=$Actor}
+        $params = @{Actor=$Actor; StateRoot=(Join-Path $repoRoot '.local/plans')}
         if ($Date) { $params.Date=$Date }
-        $plan = New-CollabPlan @params
-        $folder = Join-Path $repoRoot '.local/plans'
-        $null = New-Item -ItemType Directory -Force $folder
-        $json = $plan | ConvertTo-Json -Depth 8
-        $json | Set-Content (Join-Path $folder "$Actor-$($plan.date).json") -Encoding utf8
-        $json
+        else { $params.Date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'Asia/Shanghai').ToString('yyyy-MM-dd') }
+        Get-LockedCollabPlan @params | ConvertTo-Json -Depth 8
+    }
+    Next {
+        Get-CollabWakeup -Actor $Actor -StateRoot (Join-Path $repoRoot '.local/plans') | ConvertTo-Json -Depth 8
     }
 }

@@ -28,16 +28,17 @@ function New-CollabPlan {
     $config = Get-CollabConfig
     if ($Actor -notin $config.actors) { throw "Unknown participant: $Actor" }
     $null = [DateTime]::ParseExact($Date, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-    $seedText = "$Date|$($config.protocolVersion)"
-    $hash = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($seedText))
-    $rng = [Random]::new([BitConverter]::ToInt32($hash, 0) -band [int]::MaxValue)
-    $selected = @($config.firstHour..$config.lastHour)
     $actorOffset = [array]::IndexOf($config.actors, $Actor) * $config.peerOffsetMinutes
-    $minute = $rng.Next($config.minuteMin, $config.minuteMax + 1) + $actorOffset
-    $minutes = @($minute..59 | Where-Object { ($_ - $minute) % $config.intervalMinutes -eq 0 })
+    $midnight = [DateTimeOffset]::ParseExact("${Date}T00:00:00+08:00", "yyyy-MM-dd'T'HH:mm:sszzz", [Globalization.CultureInfo]::InvariantCulture)
     $times = @(
-        foreach ($hour in $selected) {
-            foreach ($slotMinute in $minutes) { '{0}T{1:00}:{2:00}:00+08:00' -f $Date, $hour, $slotMinute }
+        for ($slot = 0; $slot -lt $config.windowsPerDay; $slot++) {
+            $key = "$Date|$($config.protocolVersion)|$slot"
+            $hash = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($key))
+            # Explicit byte order keeps both Windows machines on the same plan.
+            $sample = [uint32]$hash[0] * 16777216 + [uint32]$hash[1] * 65536 + [uint32]$hash[2] * 256 + [uint32]$hash[3]
+            $jitter = $config.minuteMin + $sample % ($config.minuteMax - $config.minuteMin + 1)
+            $at = $midnight.AddMinutes($config.firstHour * 60 + $slot * $config.intervalMinutes + $jitter + $actorOffset)
+            $at.ToString("yyyy-MM-dd'T'HH:mm:sszzz")
         }
     )
     [pscustomobject]@{
@@ -45,14 +46,59 @@ function New-CollabPlan {
         protocolVersion = $config.protocolVersion
         date = $Date
         timezone = $config.timezone
-        hours = $selected
-        minute = $minute
-        minutes = $minutes
         times = $times
-        rrule = "RRULE:FREQ=DAILY;BYHOUR=$($selected -join ',');BYMINUTE=$($minutes -join ',');BYSECOND=0"
         targetRunMinutes = $config.targetRunMinutes
         maxRunMinutes = $config.maxRunMinutes
     }
+}
+
+function Get-LockedCollabPlan {
+    param(
+        [Parameter(Mandatory)][string]$Actor,
+        [Parameter(Mandatory)][string]$Date,
+        [Parameter(Mandatory)][string]$StateRoot
+    )
+    $config = Get-CollabConfig
+    if ($Actor -notin $config.actors) { throw "Unknown participant: $Actor" }
+    $null = [DateTime]::ParseExact($Date, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+    $path = Join-Path $StateRoot "$Actor-$Date.json"
+    if (Test-Path -LiteralPath $path) {
+        $parse = @{ InputObject = Get-Content -LiteralPath $path -Raw }
+        if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $parse.DateKind = 'String' }
+        $saved = ConvertFrom-Json @parse
+        if ($saved.actor -eq $Actor -and $saved.protocolVersion -eq $config.protocolVersion) { return $saved }
+    }
+    $plan = New-CollabPlan -Actor $Actor -Date $Date
+    $null = New-Item -ItemType Directory -Force $StateRoot
+    $plan | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding utf8
+    $plan
+}
+
+function Get-CollabWakeup {
+    param(
+        [Parameter(Mandatory)][string]$Actor,
+        [Parameter(Mandatory)][string]$StateRoot,
+        [DateTimeOffset]$Now = [DateTimeOffset]::UtcNow
+    )
+    $local = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId($Now, 'Asia/Shanghai')
+    foreach ($dayOffset in 0..1) {
+        $date = $local.AddDays($dayOffset).ToString('yyyy-MM-dd')
+        $plan = Get-LockedCollabPlan -Actor $Actor -Date $date -StateRoot $StateRoot
+        foreach ($time in $plan.times) {
+            $at = [DateTimeOffset]::Parse($time)
+            if ($at -gt $Now) {
+                return [pscustomobject]@{
+                    actor = $Actor
+                    protocolVersion = $plan.protocolVersion
+                    planDate = $plan.date
+                    nextAt = $at.ToString("yyyy-MM-dd'T'HH:mm:sszzz")
+                    timezone = $plan.timezone
+                    rrule = "RRULE:FREQ=DAILY;BYHOUR=$($at.Hour);BYMINUTE=$($at.Minute);BYSECOND=0"
+                }
+            }
+        }
+    }
+    throw 'No future wakeup in the current or next day plan'
 }
 
 function Get-CollabInbox {
@@ -81,4 +127,4 @@ function Get-CollabInbox {
     }
 }
 
-Export-ModuleMember -Function Get-CollabConfig, Invoke-GhJson, Assert-CollabIdentity, New-CollabPlan, Get-CollabInbox
+Export-ModuleMember -Function Get-CollabConfig, Invoke-GhJson, Assert-CollabIdentity, New-CollabPlan, Get-LockedCollabPlan, Get-CollabWakeup, Get-CollabInbox

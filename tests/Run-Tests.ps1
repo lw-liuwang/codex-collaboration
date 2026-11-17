@@ -11,15 +11,22 @@ $plans = foreach ($actor in @('lw-liuwang','ZicongHe2002')) {
 }
 foreach ($plan in $plans) {
     Assert ($plan.times.Count -eq 42) 'Expected forty-two slots'
-    Assert (@($plan.hours | Sort-Object -Unique).Count -eq 14) 'Expected every hour in the daytime window'
-    Assert (($plan.hours | Measure-Object -Minimum).Minimum -ge 9 -and ($plan.hours | Measure-Object -Maximum).Maximum -le 22) 'Hours outside window'
-    Assert ($plan.minutes.Count -eq 3) 'Expected three slots per hour'
-    Assert ($plan.minute -ge 2 -and $plan.minute -le 18) 'Minute outside window'
-    for ($i=1; $i -lt $plan.times.Count; $i++) {
-        Assert (([DateTimeOffset]$plan.times[$i] - [DateTimeOffset]$plan.times[$i-1]).TotalMinutes -eq 20) 'Wakeups must be exactly twenty minutes apart'
+    $offset = if ($plan.actor -eq 'lw-liuwang') { 0 } else { 10 }
+    $midnight = [DateTimeOffset]::Parse("$($plan.date)T00:00:00+08:00")
+    for ($i=0; $i -lt $plan.times.Count; $i++) {
+        $at = [DateTimeOffset]$plan.times[$i]
+        Assert ($at.Hour -ge 9 -and $at.Hour -le 22) 'Wakeup outside daytime window'
+        $jitter = ($at - $midnight).TotalMinutes - 540 - $i*20 - $offset
+        Assert ($jitter -ge 2 -and $jitter -le 8) 'Each wakeup must stay in its own random slot'
     }
+    $intervals = @()
+    for ($i=1; $i -lt $plan.times.Count; $i++) {
+        $gap = ([DateTimeOffset]$plan.times[$i] - [DateTimeOffset]$plan.times[$i-1]).TotalMinutes
+        Assert ($gap -ge 14 -and $gap -le 26) 'Randomized gap outside intended range'
+        $intervals += $gap
+    }
+    Assert (@($intervals | Sort-Object -Unique).Count -gt 1) 'Wakeups must not form a fixed twenty-minute grid'
 }
-Assert (@($plans | Where-Object actor -eq 'lw-liuwang' | ForEach-Object minute | Sort-Object -Unique).Count -ge 4) 'Daily offset should vary'
 foreach ($day in 1..28) {
     $date = '2026-11-{0:00}' -f $day
     $a = New-CollabPlan -Actor lw-liuwang -Date $date
@@ -27,6 +34,31 @@ foreach ($day in 1..28) {
     for ($i=0; $i -lt $a.times.Count; $i++) {
         Assert (([DateTimeOffset]$b.times[$i] - [DateTimeOffset]$a.times[$i]).TotalMinutes -eq 10) 'Actors must alternate with a ten-minute offset'
     }
+}
+
+$planRoot = Join-Path $PSScriptRoot "../.local/test-plans-$([guid]::NewGuid().ToString('N'))"
+try {
+    $locked = Get-LockedCollabPlan -Actor lw-liuwang -Date '2026-11-17' -StateRoot $planRoot
+    $planFile = Join-Path $planRoot 'lw-liuwang-2026-11-17.json'
+    $before = Get-Content -LiteralPath $planFile -Raw
+    (Get-Item -LiteralPath $planFile).LastWriteTimeUtc = [DateTime]'2000-01-01T00:00:00Z'
+    $stamp = (Get-Item -LiteralPath $planFile).LastWriteTimeUtc
+    $reloaded = Get-LockedCollabPlan -Actor lw-liuwang -Date '2026-11-17' -StateRoot $planRoot
+    Assert (($locked.times -join ',') -eq ($reloaded.times -join ',')) 'Reload must keep the locked plan'
+    Assert ((Get-Content -LiteralPath $planFile -Raw) -eq $before) 'Reload must not rewrite the locked plan'
+    Assert ((Get-Item -LiteralPath $planFile).LastWriteTimeUtc -eq $stamp) 'Reload must reuse the persisted file'
+    $early = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now '2026-11-17T08:30:00+08:00'
+    Assert ($early.nextAt -eq $locked.times[0]) 'Morning planner must select the first slot'
+    $next = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now $locked.times[0]
+    Assert ($next.nextAt -eq $locked.times[1]) 'A fired slot must advance to the next one'
+    $late = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now '2026-11-17T23:00:00+08:00'
+    Assert ($late.planDate -eq '2026-11-18') 'Night must advance to tomorrow without catch-up'
+    $resume = Get-CollabWakeup -Actor lw-liuwang -StateRoot $planRoot -Now '2026-11-17T16:00:00+08:00'
+    Assert ([DateTimeOffset]$resume.nextAt -gt [DateTimeOffset]'2026-11-17T16:00:00+08:00') 'Resume must skip missed slots'
+    Assert ($resume.rrule -notmatch ',') 'Next recurrence must contain one hour and one minute'
+} finally {
+    Get-ChildItem -LiteralPath $planRoot -File -ErrorAction SilentlyContinue | Remove-Item
+    if (Test-Path -LiteralPath $planRoot) { Remove-Item -LiteralPath $planRoot }
 }
 
 $global:collabTestUser = 'lw-liuwang'

@@ -100,6 +100,6 @@ JSON 形状为 `{"query":"上面的 GraphQL 字符串","variables":{"repo":"真�
 
 ## 待办和排程
 
-脚本 Inbox 完整分页读取共享仓库 open/handoff Issues，分别输出 actionRequired、waitingOnPeer、unassigned。Assignee 是下一行动人。Doctor 检查工具和本机身份，不要求全部仓库就绪。Plan 生成本地计划；原生任务创建/更新仍由 Codex automation_update 完成。
+脚本 Inbox 完整分页读取共享仓库 open/handoff Issues，分别输出 actionRequired、waitingOnPeer、unassigned。Assignee 是下一行动人。Doctor 检查工具和本机身份，不要求全部仓库就绪。Plan 生成并锁定本地随机计划，Next 返回下一项未来时刻与单个预约的 rrule；原生任务创建/更新仍由 Codex automation_update 完成。
 
 官方参考：[CLI 安装](https://github.com/cli/cli#installation)、[OAuth 登录](https://cli.github.com/manual/gh_auth_login)、[共同作者](https://docs.github.com/en/pull-requests/committing-changes-to-your-project/creating-and-editing-commits/creating-a-commit-with-multiple-authors)、[GraphQL mutations](https://docs.github.com/en/graphql/reference/mutations)。

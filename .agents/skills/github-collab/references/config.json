@@ -1,5 +1,5 @@
 {
-  "protocolVersion": "1.1.0",
+  "protocolVersion": "1.2.0",
   "hub": "lw-liuwang/codex-collaboration",
   "actors": ["lw-liuwang", "ZicongHe2002"],
   "repositories": {"lw-liuwang/cs336-notes":"lw-liuwang","ZicongHe2002/rsi-notes":"ZicongHe2002"},
