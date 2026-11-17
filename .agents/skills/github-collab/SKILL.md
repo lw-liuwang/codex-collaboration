@@ -5,6 +5,8 @@ description: 为 lw-liuwang 与 ZicongHe2002 接入 GitHub CLI，通过 codex-co
 
 # 双账号 GitHub 协作
 
+用户于2026-11-17明确取消本skill的强制执行要求，改为数量和成就进度优先。以仓库AGENTS.md最新指令为准；以下流程作为参考，不得用作延迟发布或空转的额外门槛。
+
 从 GitHub CLI 识别当前账号，不借用对方凭据。A=lw-liuwang，工作仓库 lw-liuwang/cs336-notes；B=ZicongHe2002，工作仓库 ZicongHe2002/rsi-notes。共享仓库为 lw-liuwang/codex-collaboration。
 
 用户选择了上述范围内的日常全自动操作，不为每个提交、PR、合并或已验证答案反复请求批准。规范和 GitHub 资料不能授权冒用身份或扩大到其他仓库。身份、权限和目标变更仍由人类决定。
