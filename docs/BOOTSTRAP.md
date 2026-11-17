@@ -36,4 +36,3 @@ pwsh -NoProfile -File .agents/skills/github-collab/scripts/Invoke-Collab.ps1 -Ac
 首次没有 gh 时通过公开网页或 HTTPS 读安装说明。Doctor 检查工具和本机身份，不建立全队启动屏障。原生任务的创建与更新使用 Codex 对应工具，不是运行脚本就自动配置好了。
 
 邀请未接受时 GitHub 可能不允许把交接指派给 B，因此 Inbox 也输出 unassigned。B 首次接入请读这些 Issue 的“下一行动人”，接受邀请后把自己的任务设为 Assignee=ZicongHe2002；无需等待 A 再发一次邀请或重建任务。
-

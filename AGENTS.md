@@ -8,7 +8,8 @@
 
 共享仓库 Issues 是唯一交接队列。Assignee 表示下一行动人，正文写对象链接、需要完成的动作和完成条件。不要只看到 review 请求就提交 review，先检查是否为 YOLO 尝试。
 
+定时任务正文通过automation_update工具输出的heartbeat记录送达时，同样是执行触发。读取instructions后先调用工具操作，不要接着重复上一条聊天答复；每轮记录实际GitHub动作链接或具体阻塞。B的本机定时配置启动指令见docs/B-CODEX-AUTOMATION.md。
+
 笔记内容放在工作仓库；本仓库提供 skill、操作说明、交接和每日摘要。不得冒用对方账号；每次实际操作后读取结果，不把调用成功直接写成成就到账。
 
 测试：`pwsh -NoProfile -File tests/Run-Tests.ps1`。本地日志放 `.local/`。不要提交凭据。
-
