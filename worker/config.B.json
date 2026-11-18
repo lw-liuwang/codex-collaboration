@@ -1,0 +1,8 @@
+{
+  "actor": "ZicongHe2002",
+  "trusted_authors": ["lw-liuwang", "ZicongHe2002"],
+  "state_dir": "../.local/worker-B",
+  "required_checks": {
+    "ZicongHe2002/rsi-notes": []
+  }
+}

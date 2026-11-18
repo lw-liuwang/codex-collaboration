@@ -1,0 +1,8 @@
+{
+  "actor": "lw-liuwang",
+  "trusted_authors": ["lw-liuwang", "ZicongHe2002"],
+  "state_dir": "../.local/worker-A",
+  "required_checks": {
+    "lw-liuwang/cs336-notes": []
+  }
+}
