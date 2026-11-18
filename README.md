@@ -11,7 +11,9 @@
 
 ## 把这个链接交给 B
 
-让 B 的账号持有人把 [启动提示词](docs/BOOTSTRAP.md#给-b-的启动提示词) 发给自己的 Codex。它读取本仓库、安装配置 GitHub CLI、确认自己的身份、接受邀请、创建自己的 RSI 仓库，再领取本仓库指派给它的交接任务。工作仓库链接是否已经存在，以实际查询为准。
+已安装无模型worker的B：[下载程序包](https://github.com/lw-liuwang/codex-collaboration/archive/refs/heads/main.zip)，解压后双击 `B-START.cmd`，自动更新并恢复现有任务；不需要向Codex发提示词，也不用填写任务参数。首次安装同样可用，前提与状态说明见[后台worker](docs/GH-WORKER.md#给-b-安装)。
+
+原Codex协作模式的接入说明仍在[启动提示词](docs/BOOTSTRAP.md#给-b-的启动提示词)，用于需要模型参与的内容工作。无模型后台任务使用上面的双击入口。工作仓库链接是否已经存在，以实际查询为准。
 
 本机已克隆规范仓库时，项目 skill 位于 [.agents/skills/github-collab](.agents/skills/github-collab/SKILL.md)。会话和原生定时任务从规范仓库启动即可，不需要覆盖全局 skills。
 

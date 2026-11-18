@@ -6,6 +6,12 @@
 
 ## 给 B 安装
 
+**直接下载、解压、双击：** [下载准备好的程序包](https://github.com/lw-liuwang/codex-collaboration/archive/refs/heads/main.zip)，解压后双击根目录的 `B-START.cmd`。使用B自己的Windows账号，保持本机 `gh` 登录为 `ZicongHe2002`；B已安装的Git、Python和GitHub CLI继续使用，不需要Codex。
+
+入口自动找到现有 `GitHubCollabWorker-B` 的程序和数据库目录，在干净的main上快进更新，然后运行任务135的恢复与回读。保留原30分钟计划、数据库和暂停状态；有暂停、已禁用、只读安装、未知配置、分支或未提交修改时显示具体原因并停止，不覆盖。若已有worker正在执行，等该轮退出后再次双击即可。
+
+首次安装且没有已有任务时，入口使用当前Git检出；从ZIP运行时自动克隆到 `%LOCALAPPDATA%\GitHubCollabWorker\codex-collaboration`，随后安装并立即请求首轮扫描。下载目录可删除，已安装的稳定目录须保留。窗口结束时保留结果供查看；安装请求成功与实际GitHub任务完成分别以健康页和任务135回读为准。下面的命令行入口仍可用于诊断。
+
 在 **B 自己的 Windows 账号**下打开 PowerShell。需要 Python 3.10+（包含 `pythonw.exe`）、Git 和 GitHub CLI；用 `gh auth status` 确认当前账号是 `ZicongHe2002`。安装器也会核对身份，身份不符就拒绝注册任务，不会借用 A 的凭据。
 
 首次克隆：
