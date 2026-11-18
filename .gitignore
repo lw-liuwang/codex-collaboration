@@ -1,3 +1,4 @@
 .local/
 .codex/
 *.tmp
+__pycache__/
