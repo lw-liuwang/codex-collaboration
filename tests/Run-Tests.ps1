@@ -109,5 +109,6 @@ try {
     Remove-Variable collabTestUser,collabTestPages -Scope Global
 }
 'PASS: schedule invariants, repeatability, identity, full pagination and inbox routing'
+& (Join-Path $PSScriptRoot 'Test-BLauncher.ps1')
 & python -X utf8 -m unittest discover -s $PSScriptRoot -p test_worker.py
 if ($LASTEXITCODE -ne 0) { throw 'Model-free worker behavioral tests failed' }
