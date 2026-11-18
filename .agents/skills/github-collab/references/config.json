@@ -18,10 +18,6 @@
   "intervalMinutes": 5,
   "peerOffsetMinutes": 2,
   "targetRunMinutes": 18,
-  "prBatchMin": 3,
-  "prBatchMax": 7,
-  "qaBatchMin": 3,
-  "qaBatchMax": 7,
   "maxRunMinutes": 60,
   "dailyMergedTarget": 15,
   "phaseDays": 14,
@@ -35,5 +31,13 @@
     "galaxy-brain": 32,
     "pull-shark": 1024
   },
-  "schedulingMode": "native-recurring-five-minutes"
+  "schedulingMode": "native-recurring-five-minutes",
+  "roundAcceptance": {
+    "incomingPRs": "all-open",
+    "peerDiscussions": "all-pending-questions",
+    "ownDiscussions": "all-pending-answer-verification",
+    "minimumNewPeerPRs": 3,
+    "requireRealCoauthorshipBeforeNormalMerge": true,
+    "reference": "docs/ROUND-ACCEPTANCE.md"
+  }
 }
