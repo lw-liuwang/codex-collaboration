@@ -31,7 +31,7 @@
     "galaxy-brain": 32,
     "pull-shark": 1024
   },
-  "schedulingMode": "native-recurring-five-minutes",
+  "schedulingMode": "native-recurring-fifteen-minutes",
   "roundAcceptance": {
     "incomingPRs": "all-open",
     "peerDiscussions": "all-pending-questions",
@@ -39,5 +39,6 @@
     "minimumNewPeerPRs": 3,
     "requireRealCoauthorshipBeforeNormalMerge": true,
     "reference": "docs/ROUND-ACCEPTANCE.md"
-  }
+  },
+  "nativeIntervalMinutes": 15
 }
