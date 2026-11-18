@@ -105,6 +105,23 @@ python -X utf8 worker/collab_worker.py inspect-discussion --config worker/config
 
 ## 状态、暂停与恢复
 
+### B 当前任务135的一键恢复
+
+在 B 已安装服务的共享仓库目录中运行：
+
+```powershell
+git pull --ff-only origin main
+powershell -NoProfile -ExecutionPolicy Bypass -File worker/Repair-Worker.ps1
+```
+
+第二条命令默认使用B已安装的配置和任务135，不需要手填effect key。它核对本机身份、指派、可信作者及任务内容，完整分页回查目标评论和回执；已有结果直接续做，缺失的`sent`步骤先备份SQLite数据库，再进行一次明确的恢复尝试，最后执行正常轮询并回读任务完成结果。再次运行不会重复发布已完成的评论。恢复报告为`.local/installed-worker-B/recovery-135.json`，数据库备份位于同目录的`backups/`。
+
+它保留原半小时计划、暂停标记和数据库，仅支持确定文本的`issue_comment`任务。不会替B生成答案、审核或合并PR。已完成操作被删除、评论被编辑或重复、任务内容改变、身份不符、窗口外及暂停状态均停止恢复，不覆盖现状。若GitHub或网络故障仍在，命令返回失败，并报告HTTP状态、gh退出码及固定错误类别；原始stderr和凭据不会写入健康页。
+
+只读检查可加`-ReadOnly`；其他已安装目录可用`-WorkerRoot`。恢复其他评论任务时传`-QueueIssue`，例如`-QueueIssue 142`。这是一项显式的本机恢复操作：评论接口没有通用幂等键，远端未查到结果仍不能绝对排除延迟应用，因此不在半小时轮询里自动清空所有不确定记录。其他任务的记录保持不变。
+
+### 服务控制
+
 ```powershell
 powershell -NoProfile -File worker/Control-Worker.ps1 -Actor B -Action Status
 powershell -NoProfile -File worker/Control-Worker.ps1 -Actor B -Action Pause
