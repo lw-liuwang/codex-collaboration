@@ -11,13 +11,13 @@ import sqlite3
 import subprocess
 import sys
 import time
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 BJT = timezone(timedelta(hours=8))
 HUB = 'lw-liuwang/codex-collaboration'
 REPOS = {'lw-liuwang': 'lw-liuwang/cs336-notes', 'ZicongHe2002': 'ZicongHe2002/rsi-notes'}
@@ -45,6 +45,28 @@ class ApiError(Exception):
     def __init__(self, message, status=None):
         super().__init__(message)
         self.status = status
+
+
+def request_failure(result, method, endpoint):
+    error = result.stderr.decode('utf-8', errors='replace')
+    match = re.search(r'HTTP (\d{3})', error)
+    status = int(match[1]) if match else None
+    category = 'unknown'
+    for name, pattern in [('timeout', r'timed? out|deadline exceeded'),
+                          ('dns', r'no such host|getaddrinfo'),
+                          ('tls', r'x509|certificate'),
+                          ('connection', r'connection refused|connection reset|network is unreachable')]:
+        if re.search(pattern, error, re.I):
+            category = name
+            break
+    # Report fixed categories and numeric status only; never include raw stderr.
+    return ApiError(f'gh API 请求失败: {method} {endpoint.split("?")[0]}; '
+                    f'HTTP {status or "unknown"}; gh exit {result.returncode}; category={category}', status)
+
+
+def receipt_body(result):
+    return ('worker 已回读操作结果。\n\n```json\n'+json.dumps(result,ensure_ascii=False,indent=2)+
+            '\n```\n\n这是结构化任务的执行回执，不代表新增内容判断、共同写作或徽章到账。')
 
 
 def digest(value):
@@ -131,10 +153,7 @@ class Gh:
         except subprocess.TimeoutExpired as exc:
             raise ApiError('gh 请求超时；写请求需先回查') from exc
         if result.returncode:
-            error = result.stderr.decode('utf-8', errors='replace')
-            status = re.search(r'HTTP (\d{3})', error)
-            # Do not log stderr, payloads, or credentials supplied by a subprocess.
-            raise ApiError(f'gh API 请求失败: {method} {endpoint.split("?")[0]}', int(status[1]) if status else None)
+            raise request_failure(result, method, endpoint)
         return result.stdout if raw else json.loads(result.stdout or b'null')
 
     def pages(self, endpoint):
@@ -161,7 +180,7 @@ class Gh:
         except subprocess.TimeoutExpired as exc:
             raise ApiError('GraphQL读取超时') from exc
         if result.returncode:
-            raise ApiError('GraphQL读取失败')
+            raise request_failure(result, 'query', 'graphql')
         value = json.loads(result.stdout)
         if value.get('errors'):
             raise ApiError('GraphQL返回错误')
@@ -312,17 +331,101 @@ class Worker:
             comment['replies'] = self.connection(query, {'id':comment['id']}, lambda d:d['node']['replies'])
         return comments
 
+    def read_comment(self, key, repo, number, body):
+        marker = '<!-- collab-worker:' + key + ' -->'
+        endpoint = f'repos/{repo}/issues/{number}/comments'
+        matches = []
+        for comment in self.gh.pages(endpoint):
+            if comment['user']['login'] == self.actor and marker in (comment['body'] or ''):
+                if comment['body'].replace('\r\n','\n') != (body+'\n\n'+marker).replace('\r\n','\n'):
+                    raise Blocked('已发布的回执或评论被编辑，保留现状')
+                matches.append({'url':comment['html_url']})
+        if len(matches) > 1:
+            raise Blocked('同一任务标记存在多条评论，保留现状并检查重复原因')
+        return matches[0] if matches else None
+
     def comment_effect(self, key, repo, number, body):
         marker = '<!-- collab-worker:' + key + ' -->'
         endpoint = f'repos/{repo}/issues/{number}/comments'
-        def read():
-            for c in self.gh.pages(endpoint):
-                if c['user']['login'] == self.actor and marker in (c['body'] or ''):
-                    if c['body'].replace('\r\n','\n') != (body+'\n\n'+marker).replace('\r\n','\n'):
-                        raise Blocked('已发布的回执或评论被编辑，保留现状')
-                    return {'url':c['html_url']}
-            return None
-        return self.store.once(key, lambda:self.gh.api(endpoint, 'POST', {'body':body+'\n\n'+marker}), read)
+        return self.store.once(key, lambda:self.gh.api(endpoint, 'POST', {'body':body+'\n\n'+marker}),
+                               lambda:self.read_comment(key, repo, number, body))
+
+    def assigned_task(self, number, allow_closed=False):
+        issue = self.gh.api(f'repos/{HUB}/issues/{number}')
+        if 'pull_request' in issue or issue['user']['login'] not in self.config['trusted_authors']:
+            raise Blocked('需要受信任作者发布的任务Issue')
+        if ((issue['state'] != 'open' and not allow_closed) or
+                self.actor not in {a['login'] for a in issue['assignees']} or
+                LABEL not in {label['name'] for label in issue['labels']}):
+            raise Blocked('任务状态、指派或标签已变化')
+        task = parse_task(issue['body'])
+        if task['actor'] != self.actor:
+            raise Blocked('任务actor与执行账号不一致')
+        return issue, task
+
+    def recover_comment(self, number):
+        """Explicit local recovery of one comment task, with remote reads and a backup."""
+        self.identity()
+        key = f'{HUB}#{number}'
+        previous = self.store.job(key)
+        issue, task = self.assigned_task(number, allow_closed=bool(previous and previous['status'] in {'applied','done'}))
+        if task['operation'] != 'issue_comment':
+            raise Blocked('一键恢复只支持issue_comment，不自动重发答案、review或merge')
+        task_digest = digest(json.dumps(task, sort_keys=True, ensure_ascii=False))
+        bound = self.store.db.execute('SELECT digest FROM jobs WHERE key=?', (key,)).fetchone()
+        if bound and bound[0] != task_digest:
+            raise Blocked('已领取任务被编辑，不能恢复不同内容')
+        claimed = self.store.db.execute('SELECT job_key FROM task_ids WHERE id=?', (self.actor+':'+task['id'],)).fetchone()
+        if claimed and claimed[0] != key:
+            raise Blocked('此任务id已由其他Issue领取，保留不确定记录')
+        effect = key+':'+task_digest
+        args = task['args']
+        result = self.read_comment(effect, args['repo'], args['number'], args['body'])
+        receipt = self.read_comment(effect+':receipt', HUB, number, receipt_body(result)) if result else None
+        if previous and previous['status'] in {'applied','done'} and result is None:
+            raise Blocked('账本已有成功结果但远端评论不存在，保留删除或修改后的现状')
+        if previous and previous['status'] == 'done':
+            if issue['state'] != 'closed' or receipt is None:
+                raise Blocked('已完成任务被重新打开或回执缺失，不覆盖人工变更')
+            return {'task':issue['html_url'],'completed':True,'state':'already_done','result':result,'recovered_effects':[],'backup':None}
+        missing = [(effect, result is None), (effect+':receipt', result is not None and receipt is None),
+                   (effect+':close', issue['state'] == 'open')]
+        resets = []
+        for effect_key, absent in missing:
+            old = self.store.db.execute('SELECT state FROM effects WHERE key=?', (effect_key,)).fetchone()
+            if absent and old:
+                if old[0] != 'sent':
+                    raise Blocked('账本已完成的操作在远端缺失，不能自动重发: '+effect_key)
+                resets.append(effect_key)
+        if not self.apply:
+            return {'task':issue['html_url'],'completed':False,'state':'planned','would_recover':resets,'result':result}
+        if not self.can_write():
+            raise Blocked('保持暂停标记和09–23时窗；当前不能恢复写入')
+        # Check the source again before changing the ledger; the cycle also re-reads it.
+        current, checked = self.assigned_task(number, allow_closed=issue['state'] == 'closed')
+        if checked != task or current['state'] != issue['state']:
+            raise Blocked('恢复前任务内容或状态已变化，请回查')
+        backup_path = None
+        if resets:
+            backup_path = self.state/'backups'/f'recovery-{number}-{time.time_ns()}.sqlite3'
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            with closing(sqlite3.connect(backup_path)) as backup:
+                self.store.db.backup(backup)
+            if not self.can_write():
+                raise Blocked('恢复前已暂停或离开写入时窗，账本未改动')
+            for effect_key in resets:
+                self.store.db.execute('DELETE FROM effects WHERE key=? AND state=?', (effect_key,'sent'))
+            self.store.db.commit()
+        record = {'task':issue['html_url'],'completed':False,'state':'recovering','recovered_effects':resets,
+                  'backup':str(backup_path) if backup_path else None}
+        path = self.state/f'recovery-{number}.json'
+        atomic_json(path, record)
+        cycle = self.cycle()
+        job = next((j for j in cycle['jobs'] if j['issue'] == issue['html_url']), None)
+        record.update(completed=bool(job and job['state'] == 'done'), state=job['state'] if job else 'not_processed',
+                      detail=job, finished_at=self.clock().isoformat())
+        atomic_json(path, record)
+        return record
 
     def checked_pr(self, args, allow_merged=False):
         pr = self.gh.api(f'repos/{args["repo"]}/pulls/{args["number"]}')
@@ -516,14 +619,9 @@ class Worker:
                 if issue['user']['login'] not in self.config['trusted_authors']:
                     raise Blocked('任务作者不在本机信任列表')
                 # Re-read the actual source immediately before claiming the job.
-                current = self.gh.api(f'repos/{HUB}/issues/{issue["number"]}')
                 previous_job = self.store.job(key)
                 already_applied = previous_job and previous_job['status'] == 'applied'
-                if (current['state'] != 'open' and not already_applied) or self.actor not in {a['login'] for a in current['assignees']} or LABEL not in {l['name'] for l in current['labels']}:
-                    raise Blocked('任务状态、指派或标签已变化')
-                task = parse_task(current['body'])
-                if task['actor'] != self.actor:
-                    raise Blocked('任务actor与执行账号不一致')
+                current, task = self.assigned_task(issue['number'], allow_closed=bool(already_applied))
                 task_digest = digest(json.dumps(task, sort_keys=True, ensure_ascii=False))
                 if not self.can_write():
                     item.update(state='planned', operation=task['operation'])
@@ -535,7 +633,7 @@ class Worker:
                 else:
                     result = self.execute(task, effect_key, issuer=current['user']['login'])
                     self.store.record(key, 'applied', result)
-                self.comment_effect(effect_key+':receipt', HUB, issue['number'], 'worker 已回读操作结果。\n\n```json\n'+json.dumps(result,ensure_ascii=False,indent=2)+'\n```\n\n这是结构化任务的执行回执，不代表新增内容判断、共同写作或徽章到账。')
+                self.comment_effect(effect_key+':receipt', HUB, issue['number'], receipt_body(result))
                 endpoint = f'repos/{HUB}/issues/{issue["number"]}'
                 self.store.once(effect_key+':close', lambda:self.gh.api(endpoint,'PATCH',{'state':'closed'}),
                                 lambda:True if self.gh.api(endpoint)['state'] == 'closed' else None)
@@ -628,7 +726,7 @@ def enqueue(worker, task):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['once','doctor','status','enqueue','inspect-pr','inspect-discussion','retry-uncertain'])
+    parser.add_argument('command', choices=['once','doctor','status','enqueue','inspect-pr','inspect-discussion','retry-uncertain','recover-comment'])
     parser.add_argument('--config', required=True)
     parser.add_argument('--apply', action='store_true', help='allow writes during 09:00–23:00 Beijing time')
     parser.add_argument('--file')
@@ -655,6 +753,10 @@ def main():
                         raise Blocked('本机账号缺少仓库写权限: ' + repo)
             elif args.command == 'once':
                 value = worker.cycle()
+            elif args.command == 'recover-comment':
+                if not args.number or args.number <= 0:
+                    raise Blocked('需要待恢复任务的正整数 --number')
+                value = worker.recover_comment(args.number)
             elif args.command == 'enqueue':
                 if not args.file:
                     raise Blocked('enqueue需要 --file')
@@ -682,10 +784,12 @@ def main():
                     for reply in c['replies']:
                         reply['answer_sha256'] = digest(reply['body'])
         print(json.dumps(value,ensure_ascii=False,indent=2))
+        if args.command == 'recover-comment' and args.apply and not value['completed']:
+            return 1
         return 0
     except Busy as exc:
         print(str(exc))
-        return 0
+        return 2 if args.command == 'recover-comment' else 0
     except (Blocked, ApiError, OSError, ValueError) as exc:
         logging.error('%s', exc)
         status_path = worker.state/'status.json'

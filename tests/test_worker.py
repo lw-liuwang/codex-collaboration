@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import sqlite3
+import subprocess
 import tempfile
 import unittest
 from datetime import datetime
@@ -417,6 +419,184 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(result['jobs'][0]['state'],'planned')
         self.assertEqual(self.worker.store.db.execute('SELECT count(*) FROM jobs').fetchone()[0],0)
         self.assertFalse(any(method in {'POST','PUT','PATCH'} for _,method,_ in self.gh.calls))
+
+
+class CommentRecoveryTests(unittest.TestCase):
+    setUp = WorkerTests.setUp
+    tearDown = WorkerTests.tearDown
+
+    def prepare_recovery(self):
+        value = task('issue_comment',{'repo':w.REPOS[B],'number':2,'body':'prepared operational note'})
+        issue = {'number':9,'html_url':'queue9','body':manifest(value),'user':{'login':B},
+                 'labels':[{'name':w.LABEL}],'assignees':[{'login':A}],'state':'open'}
+        self.gh.gets[f'repos/{w.HUB}/issues/9'] = issue
+        task_digest = w.digest(json.dumps(value,sort_keys=True,ensure_ascii=False))
+        key = f'{w.HUB}#9'
+        effect = key+':'+task_digest
+        self.worker.store.bind(key,task_digest,A+':'+value['id'])
+        self.worker.store.record(key,'blocked',{'reason':'old failed request'})
+        self.worker.store.db.execute('INSERT INTO effects VALUES (?,?)',(effect,'sent'))
+        self.worker.store.db.execute('INSERT INTO effects VALUES (?,?)',('unrelated-effect','sent'))
+        self.worker.store.db.commit()
+        self.worker.inventory = Mock(return_value={})
+        self.worker.publish_health = Mock(return_value='health')
+        return issue, value, key, effect
+
+    def test_recovery_backs_up_and_retries_only_missing_comment(self):
+        issue, value, key, effect = self.prepare_recovery()
+        result = self.worker.recover_comment(9)
+        self.assertTrue(result['completed'])
+        self.assertEqual(result['recovered_effects'],[effect])
+        self.assertEqual(issue['state'],'closed')
+        self.assertEqual(len(self.gh.lists[f'repos/{w.REPOS[B]}/issues/2/comments']),1)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',('unrelated-effect',)).fetchone(),('sent',))
+        backup = sqlite3.connect(result['backup'])
+        try:
+            self.assertEqual(backup.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+        finally:
+            backup.close()
+        calls = len(self.gh.calls)
+        second = self.worker.recover_comment(9)
+        self.assertTrue(second['completed'])
+        self.assertEqual(second['state'],'already_done')
+        self.assertFalse(any(method=='POST' for _,method,_ in self.gh.calls[calls:]))
+
+    def test_existing_remote_comment_is_reused_after_lost_response(self):
+        issue, value, key, effect = self.prepare_recovery()
+        endpoint = f'repos/{w.REPOS[B]}/issues/2/comments'
+        self.gh.lists[endpoint] = [{'user':{'login':A},'body':value['args']['body']+'\n\n<!-- collab-worker:'+effect+' -->','html_url':'existing-operation'}]
+        result = self.worker.recover_comment(9)
+        self.assertTrue(result['completed'])
+        self.assertEqual(result['recovered_effects'],[])
+        self.assertFalse(any(e==endpoint and method=='POST' for e,method,_ in self.gh.calls))
+
+    def test_missing_receipt_and_uncertain_close_are_recovered(self):
+        issue, value, key, effect = self.prepare_recovery()
+        operation = {'url':'existing-operation'}
+        endpoint = f'repos/{w.REPOS[B]}/issues/2/comments'
+        self.gh.lists[endpoint] = [{'user':{'login':A},'body':value['args']['body']+'\n\n<!-- collab-worker:'+effect+' -->','html_url':operation['url']}]
+        self.worker.store.record(key,'applied',operation)
+        for suffix in [':receipt',':close']:
+            self.worker.store.db.execute('INSERT INTO effects VALUES (?,?)',(effect+suffix,'sent'))
+        self.worker.store.db.commit()
+        result = self.worker.recover_comment(9)
+        self.assertTrue(result['completed'])
+        self.assertEqual(result['recovered_effects'],[effect+':receipt',effect+':close'])
+        self.assertEqual(len(self.gh.lists[endpoint]),1)
+
+    def test_failed_remote_read_preserves_uncertain_ledger(self):
+        issue, value, key, effect = self.prepare_recovery()
+        self.gh.pages = Mock(side_effect=w.ApiError('read unavailable'))
+        with self.assertRaises(w.ApiError):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+        self.assertFalse((Path(self.temp.name)/'backups').exists())
+
+    def test_changed_task_and_deleted_applied_comment_are_preserved(self):
+        issue, value, key, effect = self.prepare_recovery()
+        value['args']['body'] = 'edited task'
+        issue['body'] = manifest(value)
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        value['args']['body'] = 'prepared operational note'
+        issue['body'] = manifest(value)
+        self.worker.store.record(key,'applied',{'url':'deleted-operation'})
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+
+    def test_dry_run_pause_and_window_preserve_ledger(self):
+        issue, value, key, effect = self.prepare_recovery()
+        self.worker.apply = False
+        self.assertEqual(self.worker.recover_comment(9)['state'],'planned')
+        self.worker.apply = True
+        pause = Path(self.temp.name)/'PAUSE'
+        pause.touch()
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        pause.unlink()
+        self.worker.clock = lambda:datetime.fromisoformat('2026-11-18T23:00:00+08:00')
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+        self.assertFalse(any(method in {'POST','PATCH'} for _,method,_ in self.gh.calls))
+
+    def test_duplicate_remote_comments_block_recovery(self):
+        issue, value, key, effect = self.prepare_recovery()
+        comment = {'user':{'login':A},'body':value['args']['body']+'\n\n<!-- collab-worker:'+effect+' -->','html_url':'duplicate'}
+        self.gh.lists[f'repos/{w.REPOS[B]}/issues/2/comments'] = [comment,comment.copy()]
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+
+    def test_recovery_rejects_wrong_identity_and_non_comment_tasks(self):
+        issue, value, key, effect = self.prepare_recovery()
+        self.gh.login = B
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.gh.login = A
+        value = task('review_pr',{'repo':w.REPOS[A],'number':1,'head':HEAD,'diff_sha256':w.digest(DIFF),'event':'COMMENT','body':'prepared review'})
+        issue['body'] = manifest(value)
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+
+    def test_recovery_reports_new_write_failure_without_claiming_success(self):
+        issue, value, key, effect = self.prepare_recovery()
+        endpoint = f'repos/{w.REPOS[B]}/issues/2/comments'
+        original = self.gh.api
+        def fail_comment(endpoint_arg,method='GET',data=None,raw=False):
+            if endpoint_arg == endpoint and method == 'POST':
+                raise w.ApiError('HTTP 403',403)
+            return original(endpoint_arg,method,data,raw)
+        self.gh.api = Mock(side_effect=fail_comment)
+        result = self.worker.recover_comment(9)
+        self.assertFalse(result['completed'])
+        self.assertEqual(result['state'],'blocked')
+        self.assertIn('HTTP 403',result['detail']['detail'])
+        self.assertEqual(issue['state'],'open')
+
+    def test_recovery_preserves_ledger_when_source_changes_during_check(self):
+        issue, value, key, effect = self.prepare_recovery()
+        original = self.worker.assigned_task
+        calls = []
+        def change_before_retry(number,allow_closed=False):
+            calls.append(number)
+            if len(calls) == 2:
+                edited = json.loads(json.dumps(value))
+                edited['args']['body'] = 'different instruction'
+                issue['body'] = manifest(edited)
+            return original(number,allow_closed)
+        self.worker.assigned_task = Mock(side_effect=change_before_retry)
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+        self.assertFalse(any(method=='POST' for _,method,_ in self.gh.calls))
+
+    def test_other_issue_claim_of_same_id_cannot_clear_uncertain_effect(self):
+        issue, value, key, effect = self.prepare_recovery()
+        self.worker.store.db.execute('UPDATE task_ids SET job_key=? WHERE id=?',('other-issue',A+':'+value['id']))
+        self.worker.store.db.commit()
+        with self.assertRaises(w.Blocked):
+            self.worker.recover_comment(9)
+        self.assertEqual(self.worker.store.db.execute('SELECT state FROM effects WHERE key=?',(effect,)).fetchone(),('sent',))
+
+
+class RequestFailureTests(unittest.TestCase):
+    def test_http_status_is_visible_without_raw_stderr(self):
+        result = subprocess.CompletedProcess([],1,b'',b'gh: private payload secret-token-value (HTTP 403)')
+        error = w.request_failure(result,'POST','repos/a/b/issues?private=hidden')
+        self.assertEqual(error.status,403)
+        self.assertIn('HTTP 403',str(error))
+        self.assertIn('gh exit 1',str(error))
+        self.assertNotIn('secret',str(error))
+        self.assertNotIn('hidden',str(error))
+
+    def test_transport_category_is_fixed_text(self):
+        result = subprocess.CompletedProcess([],1,b'',b'dial tcp: lookup example: no such host; credential=secret')
+        error = w.request_failure(result,'POST','graphql')
+        self.assertIsNone(error.status)
+        self.assertIn('category=dns',str(error))
+        self.assertNotIn('credential',str(error))
 
 
 if __name__ == '__main__':
