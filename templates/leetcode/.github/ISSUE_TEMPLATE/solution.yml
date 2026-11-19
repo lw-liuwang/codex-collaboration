@@ -1,0 +1,26 @@
+name: 题解实现
+description: 记录一道题的一种语言实现需求
+title: "[题解] "
+body:
+  - type: input
+    id: problem
+    attributes:
+      label: 题号、标题与原题链接
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: 语言
+      options:
+        - Python（A）
+        - C++17（B）
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: 实现与验收
+      description: 写清算法、复杂度、边界与对方应评审的内容。
+    validations:
+      required: true

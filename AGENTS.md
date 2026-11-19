@@ -2,6 +2,8 @@
 
 按本机 GitHub 身份执行。A=lw-liuwang，负责 CS336；B=ZicongHe2002，负责 RSI 研究笔记。
 
+2026-11-19用户最新迁移要求优先：两个新的LeetCode工作仓库，A=lw-liuwang/leetcode-solutions，B=ZicongHe2002/leetcode-solutions。A用Python向B提交Issue和PR，B用C++17向A提交Issue和PR。每个代码PR必须正式Code review，作者不能自approve；真实补写后才共同署名，最终head批准/绑定merge commit/回读保持。不再使用共享Issues交接；任务、交接与答复直接写入对应工作仓库Issue/PR。B新仓库建立前，迁移初始化任务可投B现有RSI仓库。旧CS336/RSI开放对象保留真实状态，不再新增旧主题工作PR。共享仓库仅保留工具和历史。初始化见scripts/initialize_leetcode_repo.py和templates/leetcode/；只用本机账号，定时保持暂停，09–23写入，双方银色目标继续。
+
 2026-11-19用户最新调度要求：本次按双方银色目标连续串行推进，取消15分钟定时及每日检查。A的两个原生任务已暂停；B须在本机暂停并回读，未见证据不能记B完成。不得依据下文历史指令恢复、重建或新增定时。双方Pull Shark、Pair Extraordinaire四个官方徽章均达到银色或更高后结束本次执行，不再为轮次或新PR下限追加工作。目标尚未完成时处理真实待办，等待对方则保存对象和下一行动人。北京时间09:00–23:00写入窗口保持。
 
 2026-11-19用户最新目标：A、B的Pull Shark和Pair Extraordinaire均达到银色或更高，以双方官方徽章实际回读为准。用户已明确授权两个工作仓库默认分支开启强制审批，执行与交接见[强制审批](docs/REQUIRED-REVIEW.md)。普通Ready PR显式请求对方评审，至少一位非PR作者批准；新内容推送使旧批准失效，无绕过名单，只保留merge commit。共同补写后必须对最终head批准并合并。不得为YOLO临时关闭或绕过新规则。公开PR操作总数及共同署名元数据候选数不能冒充GitHub内部认可计数；此前A“65条已合并所以精确差63”的说法已纠正。规则生效不代表成就到账。
