@@ -1,5 +1,7 @@
 # 双账号协作
 
+2026-11-19用户最新权限要求：双方不互邀加入新工作仓库，不授予或接受对方写权限。A已移除B在A LeetCode仓库的协作者权限，并拒绝B给A的邀请。双方使用各自fork向对方公开仓库发PR，fork另取名称以保留两个独立工作仓库。上游所有者评审非本人作者的PR并满足强制审批；共同补写用维护者编辑或明确交回补丁，不重新邀请。初始化脚本不再发邀请。此条优先于历史互邀、分支直推和自有仓库PR交外部账号批准的安排。
+
 按本机 GitHub 身份执行。A=lw-liuwang，负责 CS336；B=ZicongHe2002，负责 RSI 研究笔记。
 
 2026-11-19用户最新迁移要求优先：两个新的LeetCode工作仓库，A=lw-liuwang/leetcode-solutions，B=ZicongHe2002/leetcode-solutions。A用Python向B提交Issue和PR，B用C++17向A提交Issue和PR。每个代码PR必须正式Code review，作者不能自approve；真实补写后才共同署名，最终head批准/绑定merge commit/回读保持。不再使用共享Issues交接；任务、交接与答复直接写入对应工作仓库Issue/PR。B新仓库建立前，迁移初始化任务可投B现有RSI仓库。旧CS336/RSI开放对象保留真实状态，不再新增旧主题工作PR。共享仓库仅保留工具和历史。初始化见scripts/initialize_leetcode_repo.py和templates/leetcode/；只用本机账号，定时保持暂停，09–23写入，双方银色目标继续。

@@ -126,12 +126,7 @@ def initialize(actor, directory):
         raise RuntimeError("Required review rule is not effective on main")
     if rule["bypass_actors"] or rule["current_user_can_bypass"] != "never":
         raise RuntimeError("Expected no approval bypass")
-    collaborators = pages(f"repos/{repository}/collaborators")
-    pending = pages(f"repos/{repository}/invitations")
-    if not any(c["login"] == peer for c in collaborators) and not any(i["invitee"]["login"] == peer for i in pending):
-        api(f"repos/{repository}/collaborators/{peer}", "PUT", {"permission": "push"})
-        pending = pages(f"repos/{repository}/invitations")
-    return {"repository": repository, "directory": str(directory), "initialContentCreated": initial, "rulesetUrl": rule["_links"]["html"]["href"], "requiredApprovals": 1, "bypassActors": [], "peerInvitationPending": any(i["invitee"]["login"] == peer for i in pending), "existingContentOverwritten": False}
+    return {"repository": repository, "directory": str(directory), "initialContentCreated": initial, "rulesetUrl": rule["_links"]["html"]["href"], "requiredApprovals": 1, "bypassActors": [], "collaborationMode": "fork-pr", "existingContentOverwritten": False}
 
 
 def main():
