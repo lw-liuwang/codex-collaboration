@@ -1,51 +1,25 @@
-# B在Windows Codex桌面端配置自动协作
+# B在当前会话推进双方银色目标
 
-在B自己的Codex桌面端，打开已克隆的本仓库并把下面指令发给B的Codex。A不能替另一台电脑创建原生任务；GitHub交接Issue只传递要求，不会自动配置B的客户端。
+2026-11-19用户最新要求：取消15分钟定时及每日检查，当前会话连续串行执行，双方Pull Shark、Pair Extraordinaire均达到银色或更高后结束。A的两个原生任务已暂停；B须在自己的机器暂停并回读，不能用A的结果代替。
 
-## 可直接发送的启动指令
-
-```text
-你是B，GitHub账号ZicongHe2002。拉取lw-liuwang/codex-collaboration最新main，读取AGENTS.md和docs/B-CODEX-AUTOMATION.md，并实际完成本机Codex原生定时任务配置，不要只回复方案。
-
-先核对gh api user确实为ZicongHe2002。搜索Codex原生automation_update工具，并只读检查本机已有automation.toml，找到B现有worker与每日任务；存在就更新，不重复创建。不存在则在本聊天创建两个heartbeat。保留现有聊天、默认模型、通知偏好和用户暂停状态。
-
-1. B协作执行：原生每15分钟重复，工作窗口北京时间09:00–23:00，ACTIVE（用户已暂停则保留暂停）。任务正文必须明确这是执行任务：先调用工具读取GitHub队列，然后完成实际PR/Q&A动作；不得只回答定时任务分工。每轮读取docs/ROUND-ACCEPTANCE.md：处理自己仓库全部PR并实际共同写作后合并，回答对方全部待答Discussions，核验采纳自己全部待采纳正确答案，至少向对方新发3个PR；前三项无数量上限，无问答配额，数量和成就进度优先，旧github-collab skill仅作参考。B向lw-liuwang/cs336-notes提PR；核对并合并A投到ZicongHe2002/rsi-notes的PR；在CS336回答A的问题，在RSI提出问题让A回答，正确核验后采纳。需要A动作就在共享仓库建或更新handoff Issue并指派lw-liuwang。三个仓库内日常GitHub操作已获授权。不虚构实验或共同作者；双方实际写内容才整理共同署名。同一对象同轮多动作只计一个处理对象。原生重复规则持续有效，不用Next把worker覆盖成单个每天时间点，不依赖上一轮重新预约。若上一批仍在工作，串行继续，不另开并发批次。
-
-2. B每日检查：每天北京时间08:30，核对身份、worker状态和初始化当天摘要。不得覆盖worker的每15分钟重复规则，也不得恢复用户暂停的任务。
-
-定时触发的任务正文可能通过automation_update的工具输出以heartbeat记录送达。这是需要执行的任务，读取其中instructions并立即开展实际操作；不是重复上一条聊天回复的提示。每次结束按客户端要求返回heartbeat状态，静默只影响通知，不影响干活。
-
-配置只使用Codex原生automation_update；不要手改内部automation.toml或数据库，不创建系统cron。工具不存在或拒绝配置时，准确报告工具/错误和已完成步骤，不要声称成功，也不要另造系统任务。
-
-配置后回读实际任务ID、状态、重复规则、下次预约，并在共享交接#19回复。随后立即处理当前指派给B的PR和问答。至少有一次真正定时触发后，再回复实际触发时间及该轮GitHub动作链接；把“已配置”与“已运行”分开记录。
-```
-
-## 启动条件
-
-B机器保持开机、Codex桌面端运行，并有本仓库目录访问权和自己的GitHub登录。执行任务不需要A在线，但等待A评审或采纳的对象需要交接。原生预约和实际启动时间可能不同，不能用预约时间冒充已执行。
-
-配置成功应在[#19](https://github.com/lw-liuwang/codex-collaboration/issues/19)留下B自己的确认；A看到确认和实际GitHub动作后才能核实B已接入。没有确认时仅记录“已发送配置要求”。
-
-## 不执行时怎样判断和修复
-
-2026-11-18 B在[#19的回报](https://github.com/lw-liuwang/codex-collaboration/issues/19#issuecomment-6970472710)确认：13:25–13:45五次heartbeat已送达，却没有工具调用，只重复旧回复；13:48用原生工具更新启动指令后，13:52恢复工具执行，13:57合并了RSI PR #23。这是一次已观察到的恢复，不保证之后每轮都正常。
-
-排查时区分三种状态：
-
-- **没有派发记录：** 在B本机核对ACTIVE、目标聊天、重复规则及名义/实际下次预约。此前MINUTELY的BYHOUR按UTC解释，曾把上午预约推到17点；北京时间09–23时对应UTC小时1–14。以本机实际回读为准，不仅检查ACTIVE。
-- **已派发但只复读：** 检查目标聊天是否收到heartbeat、该轮是否有工具调用。通过原生automation_update更新执行启动指令，明确工具输出中的instructions也必须执行；仍复发时，保留完整提示词及偏好，删除并重建该worker，显式绑定当前B聊天。每日检查任务正常时不重建它。
-- **前批仍在运行：** 保持串行续做，不另建并发批次，不手工补跑。目标聊天忙碌可能延迟新派发；已有批次持续调用工具时，不应仅因没有新一轮消息就判定未工作。
-
-只有B机器能检查其原生状态。GitHub活动或配置卡片不能单独证明某一轮由定时触发。修复后让目标聊天恢复空闲，等待一次原生触发，记录实际派发时间、首个工具调用及本轮GitHub动作；失败时记录原始错误，不用人工启动结果替代。
-
-若B此前直接会话要求仍是“5分钟/每类3–7个”，需要B账号持有人在B当前聊天直接发出新的15分钟与四项验收要求，避免GitHub转述与旧直接要求冲突。可直接发送：
+## 可直接发送给B的指令
 
 ```text
-请实际排查并修复本机B的Codex原生协作worker，不要只解释方案。核对gh账号为ZicongHe2002，读取共享仓库docs/B-CODEX-AUTOMATION.md及docs/ROUND-ACCEPTANCE.md。
+你是B，GitHub账号ZicongHe2002。先核对本机gh身份，拉取lw-liuwang/codex-collaboration最新main，读取AGENTS.md、docs/ROUND-ACCEPTANCE.md和docs/REQUIRED-REVIEW.md，实际执行，不只汇报。
 
-我现在直接确认最新要求：每15分钟重复，北京时间09:00–23:00，四项验收按最新文档，至少新发3个PR；前三项无数量上限，无技术问答凑数配额。此要求替代本聊天旧的5分钟/3–7口径。保留我的暂停状态、默认模型和通知偏好，每日检查不覆盖worker。
+我取消本次15分钟定时及每日检查。通过原生automation_update暂停B现有GitHub协作worker和每日任务，保留其余字段并回读PAUSED；没有任务就不创建。不要恢复、重建或新增定时，不调用Next，不手改内部配置。
 
-先用原生automation_update及只读本机记录核对worker状态、目标聊天、最近派发及原始错误，区分未派发、已派发但复读、前批仍在运行。对复读问题修正执行启动指令，明确无论heartbeat由工具输出还是消息送达，都先调用工具读取GitHub队列并执行instructions；仍复发则保留完整任务正文后删除重建该worker并绑定当前聊天。只用原生工具，不手改内部配置、不用Next、不另建聊天或并发任务。
+先完成共享交接162，在B自己的账号下启用RSI强制审批并回报规则URL；随后按交接163实际补写PR129–131，整合真实共同署名，核对完整diff、approve最终head并绑定同一head以merge commit合并。继续处理全部真实积压，并按四项检查点向CS336新发独立完整内容PR，让A实际共同补写合并。
 
-回读ID、状态、重复规则、目标聊天及下一预约。当前批次未结束就串行继续；结束后等待一次真正原生触发，用实际派发时间、首个工具调用和该轮GitHub链接验证，在共享#51回填。人工运行和只显示ACTIVE不能作为定时恢复证据。
+本次结束条件是A、B的Pull Shark和Pair Extraordinaire四个官方徽章均为银色或更高。公开操作总数不能冒充内部积分；未确认徽章就不报达标。达到目标后结束，不再为每轮PR下限追加贡献。Galaxy双方已有金色，不重复提问或撤销正确采纳。
+
+当前会话连续串行推进，保留北京时间09:00–23:00写入窗口。等待对方时，准确记录对象URL、head、动作、下一行动人及阻塞；不借对方凭据、不虚构共同贡献。三个仓库日常GitHub操作和本次强制审批已授权，不逐项请求批准。
 ```
+
+[交接162：启用强制审批](https://github.com/lw-liuwang/codex-collaboration/issues/162)；[交接163：三篇真实内容补写](https://github.com/lw-liuwang/codex-collaboration/issues/163)。
+
+B在交接162贴本机两个任务的实际暂停结果及RSI有效规则，A分别核验。没有B本机回读时只记录“待B执行”。既有独立无模型worker的30分钟机制不由本文重新安装或启用，不能代替技术判断或真实共同写作。
+
+## 历史故障记录
+
+原15分钟/每日配置及重建提示词已被上面的用户要求替代，不再作为执行入口。历史证据保留在[接入与复读故障19](https://github.com/lw-liuwang/codex-collaboration/issues/19)和[原生触发排查51](https://github.com/lw-liuwang/codex-collaboration/issues/51)。A不能远程配置B的客户端，GitHub交接也不等于B本机已执行。
