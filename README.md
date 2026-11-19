@@ -2,9 +2,9 @@
 
 两台独立 Windows Codex，通过本仓库提供的 skill 和交接 Issues，协作维护两个主题仓库，并核查 YOLO、Pair Extraordinaire、Galaxy Brain 和 Pull Shark。
 
-2026-11-19当前目标：双方Pull Shark、Pair Extraordinaire达到银色或更高。两个工作仓库开启[强制审批](docs/REQUIRED-REVIEW.md)，至少一位非PR作者批准最终head后才能merge；A已启用，B用自己账号执行文档中的脚本。操作数量和实际官方徽章分别记录。
+2026-11-19当前目标：双方Pull Shark、Pair Extraordinaire达到银色或更高。两个工作仓库的[强制审批](docs/REQUIRED-REVIEW.md)均已启用并回读，至少一位非PR作者批准最终head后才能merge。操作数量和实际官方徽章分别记录。
 
-用户已取消本次15分钟定时和每日检查，改为当前会话连续串行推进，双方四个官方目标徽章达银后结束。A两个原生任务已暂停；B须在本机暂停并回读。下方旧安装资料不构成恢复或新建定时的要求。
+用户已取消本次15分钟定时和每日检查，改为当前会话连续串行推进，双方四个官方目标徽章达银后结束。A两个原生任务已暂停；B已在[交接162回报](https://github.com/lw-liuwang/codex-collaboration/issues/162#issuecomment-7003142615)原生每日任务暂停、旧15分钟任务不存在、Windows worker已禁用。下方旧安装资料不构成恢复或新建定时的要求。
 
 2026-11-18新增：[每半小时运行的无模型后台worker](docs/GH-WORKER.md)。由Windows任务计划程序直接运行Python和GitHub CLI，不依赖Codex；支持结构化GitHub操作任务、回读与重启恢复，提供B的安装脚本。技术内容的编写和正确性判断仍需真实成果，不能由机械执行替代。
 

@@ -12,11 +12,13 @@
 
 现有仓库没有依赖CODEOWNERS的指定审稿人规则，本次不要求代码所有者审批；也不额外要求讨论线程全部解决。至少一位有权限的非PR作者批准是合并前置条件。不得临时关闭规则或加绕过名单执行YOLO路径。
 
-## A已经启用，B在自己账号执行
+## 双方已经启用
 
 A仓库[cs336-notes规则集27616521](https://github.com/lw-liuwang/cs336-notes/rules/27616521)已启用并回读：active、至少1个批准、无绕过名单、当前A不可绕过，main为protected。
 
-B仓库为`ZicongHe2002/rsi-notes`。A对它只有push权限，不能代替所有者开启规则。B使用自己已经登录的gh账号，在共享仓库运行：
+B仓库[RSI规则集27618831](https://github.com/ZicongHe2002/rsi-notes/rules/27618831)已于北京时间15:49启用。B的[管理员回读](https://github.com/lw-liuwang/codex-collaboration/issues/162#issuecomment-7003142615)确认无绕过名单、B不可绕过；A独立读取有效默认分支规则及protected状态，已确认至少1批准、推送撤销旧批准及只允许merge。A的非管理员响应不展示bypass_actors，不能把字段缺失误报为配置错误。
+
+A对RSI只有push权限，规则由B自己的gh账号设置。以下命令可幂等核对已有配置，无需重复创建：
 
 ```powershell
 git pull --ff-only origin main
@@ -25,7 +27,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Enable-RequiredRevie
 
 先查看计划可加`-PlanOnly`。脚本核对账号、仓库管理员权限和北京时间09:00–23:00写入窗口；只管理上述同名规则，不改其他规则、凭据、worker或定时任务。重复运行会复用已有规则，匹配时只读，不新建重复规则。网络写入失败后先回查再决定结果。
 
-成功后回读规则URL、至少1个批准、无绕过名单及当前账号不能绕过。B将实际结果贴回对应共享handoff；A还要读取RSI默认分支有效规则，才记录双方都已生效。缺B执行证据时只记A完成、B待执行。
+成功后回读规则URL、至少1个批准、无绕过名单及当前账号不能绕过。B管理员回读与A独立有效规则核对均已完成；双方规则生效不代表四个银色目标徽章已经到账。
 
 ## 银色进度
 
